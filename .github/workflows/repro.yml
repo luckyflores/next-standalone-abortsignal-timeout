@@ -1,0 +1,57 @@
+name: repro
+on: [push, workflow_dispatch]
+
+# Each job builds a Next.js `output: 'standalone'` app with Turbopack, runs the
+# emitted server.js, and probes it. A stub upstream counts which fetches were
+# actually dispatched. Exit 0 = PASS (all fetches arrived), 42 = BUG REPRODUCED
+# (AbortSignal.timeout fetches never arrived while AbortController fetches did).
+#
+# The matrix crosses two axes to localise the trigger:
+#   * runtime  : ubuntu glibc (setup-node) vs node:20-alpine musl (container)
+#   * app shape: `base` (minimal, one route) vs `sink` (nocmon-shaped)
+#   * overlay  : whether the full build node_modules is copied over the
+#                standalone bundle at runtime (mirrors nocmon's Dockerfile).
+
+jobs:
+  glibc:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: base, pm: npm,  expect: 'T,C',         overlay: '0' }
+          - { variant: sink, pm: pnpm, expect: 'T,C,P,r,a,R', overlay: '0' }
+    name: glibc-${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20.20.2' }
+      - run: node --version
+      - name: build + probe
+        env:
+          RUNTIME_OVERLAY: ${{ matrix.overlay }}
+        run: bash run-variant.sh "$PWD/${{ matrix.variant }}" "${{ matrix.pm }}" "glibc-${{ matrix.variant }}" "${{ matrix.expect }}"
+
+  musl:
+    runs-on: ubuntu-latest
+    container: node:20-alpine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: base, pm: npm,  expect: 'T,C',         overlay: '0' }
+          - { variant: sink, pm: pnpm, expect: 'T,C,P,r,a,R', overlay: '0' }
+          - { variant: sink, pm: pnpm, expect: 'T,C,P,r,a,R', overlay: '1' }
+    name: musl-${{ matrix.variant }}${{ matrix.overlay == '1' && '-overlay' || '' }}
+    steps:
+      # Only bash (for the script) + git (for checkout). Deliberately NOT
+      # libc6-compat — nocmon's production image is plain node:20-alpine, and
+      # the whole point is to test musl as shipped.
+      - name: alpine prereqs
+        run: apk add --no-cache bash git
+      - uses: actions/checkout@v4
+      - run: node --version && cat /etc/os-release | head -1
+      - name: build + probe
+        env:
+          RUNTIME_OVERLAY: ${{ matrix.overlay }}
+        run: bash run-variant.sh "$PWD/${{ matrix.variant }}" "${{ matrix.pm }}" "musl-${{ matrix.variant }}${{ matrix.overlay == '1' && '-overlay' || '' }}" "${{ matrix.expect }}"

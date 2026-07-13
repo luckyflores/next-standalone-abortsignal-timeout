@@ -1,0 +1,13 @@
+{
+  "name": "base",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "start": "node .next/standalone/server.js"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  }
+}

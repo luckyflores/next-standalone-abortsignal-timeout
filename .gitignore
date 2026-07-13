@@ -1,0 +1,9 @@
+node_modules/
+.next/
+*.log
+install.log
+build.log
+server.log
+stub.log
+pnpm-lock.yaml
+package-lock.json
