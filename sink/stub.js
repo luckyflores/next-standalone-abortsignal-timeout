@@ -20,4 +20,10 @@ http
       res.end(JSON.stringify({ ok: true, v }));
     }, 50);
   })
-  .listen(process.env.STUB_PORT || 9099, '127.0.0.1', () => console.log('[stub] ready'));
+  // STUB_LISTEN='::' binds dual-stack so 127.0.0.1, ::1, localhost, and a
+  // hosts-file name all reach it; default 127.0.0.1 for the IP-only cells.
+  .listen(
+    process.env.STUB_PORT || 9099,
+    process.env.STUB_LISTEN || '127.0.0.1',
+    () => console.log(`[stub] ready on ${process.env.STUB_LISTEN || '127.0.0.1'}`),
+  );

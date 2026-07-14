@@ -3,5 +3,7 @@
  * (license check-in / isp-map style: setInterval + fetch with AbortSignal.timeout).
  */
 import { startPoller } from '@/lib/poller';
+import { startStressors } from '@/lib/stress';
 
 startPoller();
+startStressors();

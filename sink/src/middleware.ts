@@ -13,7 +13,7 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const { nextUrl } = req;
   const isPublic =
-    /^\/api\/(auth|test|diag|ros|rauth|r[0-9]+)(\/|$)/.test(nextUrl.pathname) ||
+    /^\/api\/(auth|test|diag|hosts|ros|rauth|r[0-9]+)(\/|$)/.test(nextUrl.pathname) ||
     nextUrl.pathname.startsWith('/login');
 
   if (!req.auth && !isPublic) {

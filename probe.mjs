@@ -37,8 +37,8 @@ const report = { routes: {} };
 report.routes.diag = await hit('/api/diag');
 
 // 2. Warm every duplicated route chunk, then the special routes.
-for (const p of ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'rauth', 'ros']) {
-  const r = await hit('/api/' + p, 12_000);
+for (const p of ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'rauth', 'ros', 'hosts']) {
+  const r = await hit('/api/' + p, 20_000);
   if (!(r.status === 404 || r.status === 307)) report.routes[p] = r;
 }
 

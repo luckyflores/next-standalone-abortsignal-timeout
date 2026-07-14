@@ -55,3 +55,60 @@ jobs:
         env:
           RUNTIME_OVERLAY: ${{ matrix.overlay }}
         run: bash run-variant.sh "$PWD/${{ matrix.variant }}" "${{ matrix.pm }}" "musl-${{ matrix.variant }}${{ matrix.overlay == '1' && '-overlay' || '' }}" "${{ matrix.expect }}"
+
+  # Host-form axis: the app fetches an IP, `localhost`, and a DNS-resolved NAME
+  # (single A record via /etc/hosts, mirroring a Docker service name). A raw IP
+  # skips undici's dns.lookup+connect path; production fetches a name. If hl/hn
+  # never arrive while hx/C do, the failure is in the name-resolution path.
+  hosts-glibc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20.20.2' }
+      - run: echo "127.0.0.1 nocbox-upstream" | sudo tee -a /etc/hosts
+      - name: build + probe (host forms)
+        env:
+          STUB_LISTEN: '::'
+        run: bash run-variant.sh "$PWD/sink" pnpm hosts-glibc 'C,hx,hl,hn'
+
+  hosts-musl:
+    runs-on: ubuntu-latest
+    container: node:20-alpine
+    steps:
+      - name: alpine prereqs
+        run: apk add --no-cache bash git
+      - uses: actions/checkout@v4
+      - run: echo "127.0.0.1 nocbox-upstream" >> /etc/hosts
+      - name: build + probe (host forms)
+        env:
+          STUB_LISTEN: '::'
+        run: bash run-variant.sh "$PWD/sink" pnpm hosts-musl 'C,hx,hl,hn'
+
+  # MOST FAITHFUL: two containers on a bridge network; nocmon fetches the stub
+  # BY NAME via Docker's embedded DNS + a real cross-container TCP connect —
+  # the exact shape of production fetching `prometheus:9090`. Docker is
+  # available on the ubuntu runner (this is NOT the dev machine).
+  compose:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: plain,  STRESS_GC: '0', STRESS_THREADPOOL: '0', UV: '',  MEM: '0' }
+          - { name: stress, STRESS_GC: '1', STRESS_THREADPOOL: '1', UV: '1', MEM: '512m' }
+    name: compose-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: up
+        env:
+          STRESS_GC: ${{ matrix.STRESS_GC }}
+          STRESS_THREADPOOL: ${{ matrix.STRESS_THREADPOOL }}
+          UV_THREADPOOL_SIZE: ${{ matrix.UV }}
+          NOCMON_MEM: ${{ matrix.MEM }}
+        run: docker compose -f docker-compose.repro.yml up -d --build
+      - name: probe
+        run: bash compose-probe.sh
+      - name: nocmon logs
+        if: always()
+        run: docker compose -f docker-compose.repro.yml logs --tail=80 nocmon

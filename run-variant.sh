@@ -35,14 +35,18 @@ fi
 
 APP_PORT="${APP_PORT:-3199}"
 STUB_PORT="${STUB_PORT:-9099}"
+STUB_HOST="${STUB_HOST:-127.0.0.1}"       # host the app fetches (IP/localhost/name)
+STUB_LISTEN="${STUB_LISTEN:-127.0.0.1}"   # address the stub binds ('::' = dual-stack)
+STUB_NAME="${STUB_NAME:-nocbox-upstream}" # DNS name form used by /api/hosts
 
-STUB_PORT=$STUB_PORT node stub.js >stub.log 2>&1 &
+STUB_PORT=$STUB_PORT STUB_LISTEN=$STUB_LISTEN node stub.js >stub.log 2>&1 &
 SPID=$!
 sleep 0.5
 
 PORT=$APP_PORT HOSTNAME=127.0.0.1 NODE_ENV=production \
   AUTH_SECRET=devsecret-devsecret-devsecret \
-  STUB_URL="http://127.0.0.1:$STUB_PORT" \
+  STUB_URL="http://$STUB_HOST:$STUB_PORT" \
+  STUB_PORT="$STUB_PORT" STUB_NAME="$STUB_NAME" \
   node "$SJS" >server.log 2>&1 &
 NPID=$!
 

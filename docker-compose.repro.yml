@@ -1,0 +1,42 @@
+# Faithful production shape: two containers on a bridge network. `nocmon`
+# fetches `stub` BY NAME, resolved via Docker's embedded DNS (127.0.0.11, a
+# real UDP round-trip) — exactly how nocmon fetches `prometheus:9090`. The
+# earlier single-process harness resolved names via /etc/hosts, which the
+# repro deliberately avoids here.
+services:
+  stub:
+    image: node:20-alpine
+    command: node /repo/stub.js
+    environment:
+      STUB_PORT: '9099'
+      STUB_LISTEN: '0.0.0.0'
+    volumes:
+      - ./sink:/repo:ro
+    networks: [rnet]
+    ports:
+      - '9099:9099'
+
+  nocmon:
+    build:
+      context: ./sink
+    environment:
+      # The app's main fetch path (test route + boot poller) targets the Docker
+      # service NAME with AbortSignal.timeout — the production-faithful path.
+      STUB_URL: 'http://stub:9099'
+      STUB_NAME: 'stub'
+      STUB_PORT: '9099'
+      AUTH_SECRET: 'devsecret-devsecret-devsecret'
+      # Optional stressors (off unless set by the CI matrix):
+      STRESS_GC: '${STRESS_GC:-0}'
+      STRESS_THREADPOOL: '${STRESS_THREADPOOL:-0}'
+      UV_THREADPOOL_SIZE: '${UV_THREADPOOL_SIZE:-}'
+      NODE_OPTIONS: '${NODE_OPTIONS:-}'
+    # Mimic the constrained 4 GB appliance VM (toggle via CI):
+    mem_limit: '${NOCMON_MEM:-0}'
+    networks: [rnet]
+    ports:
+      - '3000:3000'
+    depends_on: [stub]
+
+networks:
+  rnet:
