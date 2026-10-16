@@ -11,10 +11,25 @@ on: [push, workflow_dispatch]
 #   * app shape: `base` (minimal, one route) vs `sink` (nocmon-shaped)
 #   * overlay  : whether the full build node_modules is copied over the
 #                standalone bundle at runtime (mirrors nocmon's Dockerfile).
+#
+# 📌 The runner is pinned to ubuntu-24.04, NOT ubuntu-latest. This file is a
+# measurement instrument whose recorded result is a NEGATIVE one: the matrix
+# did not reproduce the bug, and the standing ban on AbortSignal.timeout in
+# nocmon rests on that. Every other axis here is already pinned exactly --
+# node 20.20.2, node:20-alpine, actions @v4, and libc6-compat deliberately
+# withheld so musl is tested as shipped. The runner OS was the one axis left
+# floating. GitHub rotated ubuntu-latest from 24.04 to 26.04 between
+# 2026-10-19 and 2026-11-19 (actions/runner-images#14748), which silently
+# moves the host glibc, the preinstalled docker compose the `compose` job
+# relies on, and the default python/node. A future re-run that disagreed with
+# the recorded result would then be uninterpretable: real bug, or moved floor?
+# A repro that cannot be reproduced is not a repro.
+# ⛔ Do not put `-latest` back. Bump this on purpose, in a commit that says
+# which image it moved to and what re-run proved it.
 
 jobs:
   glibc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +48,7 @@ jobs:
         run: bash run-variant.sh "$PWD/${{ matrix.variant }}" "${{ matrix.pm }}" "glibc-${{ matrix.variant }}" "${{ matrix.expect }}"
 
   musl:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: node:20-alpine
     strategy:
       fail-fast: false
@@ -61,7 +76,7 @@ jobs:
   # skips undici's dns.lookup+connect path; production fetches a name. If hl/hn
   # never arrive while hx/C do, the failure is in the name-resolution path.
   hosts-glibc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,7 +88,7 @@ jobs:
         run: bash run-variant.sh "$PWD/sink" pnpm hosts-glibc 'C,hx,hl,hn'
 
   hosts-musl:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: node:20-alpine
     steps:
       - name: alpine prereqs
@@ -90,7 +105,7 @@ jobs:
   # the exact shape of production fetching `prometheus:9090`. Docker is
   # available on the ubuntu runner (this is NOT the dev machine).
   compose:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
